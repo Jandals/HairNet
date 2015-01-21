@@ -11,8 +11,8 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,4,8),
-        "blender": (2,6,7),
+        "version": (0,4,9),
+        "blender": (2,7,1),
         "location": "Properties",
         "category": "Particle",
         "description": "Creates a particle hair system with hair guides from mesh edges which start at marked seams.",
@@ -601,18 +601,15 @@ def subdivideGuideHairs(guides, hairObj):
 
     #subdivide hairs
     if hairObj.hnSproutHairs > 0:
+        #initialize an empty array so we don't have to think about inserting entries into lists. Check into this for later?
         newHairs = [[0 for i in range(hairLength)] for j in range(totalNumberSubdivisions(numberHairs, hairSprouts))]
         if debug: print ("Subdivide Hairs")
         newNumber = 1
 
         #initial condition
-        prev = 0
         start = guides[0][0]
-        end = guides[1][0]
-        next = 0
         newHairs[0][0] = start
 #         debPrintHairGuides(newHairs)
-        '''Fix this algorithm'''
         #for every hair pair, start at the root and send groups of four guide points to the interpolator
         #index identifies which row is current
         #kndex identifies the current hair in the list of new points
@@ -634,7 +631,6 @@ def subdivideGuideHairs(guides, hairObj):
                 handle1 = knot1.handle_right
                 handle2 = knot2.handle_left
                 newPoints = mathutils.geometry.interpolate_bezier(knot1.co, handle1, handle2, knot2.co, hairSprouts+2)
-#                 newPoints = interpolateGuidePoints(prev, start, end, next, hairSprouts)
 
 
                 #add new points to the matrix
@@ -650,58 +646,60 @@ def subdivideGuideHairs(guides, hairObj):
 
 
                 #add the end point
-#                 newHairs[2 + jndex*hairSprouts][index] = end
                 newHairs[(jndex+1)*(hairSprouts+1)][index] = guides[jndex][index]
 #                 if debug: print("newHairs[", (jndex+1)*(hairSprouts+1), "][", index, "] = ", guides[jndex][index], "Copy")
                 newNumber = newNumber + 1
 
-                #advance parameters
-                prev = start
-                start = end
-                end = next
-                next = 0
-                if (jndex + 1 < numberHairs):
-                    next = guides[jndex+1][index]
+                
             #clean up the curve we created
             bpy.data.curves.remove(curveObject)
         if debug:
             print("NewHairs")
             debPrintHairGuides(newHairs)
         guides = newHairs
+    
+    
+    
     #subdivide hair sections
     if hairObj.hnSubdivideHairSections > 0:
+        #initialize an empty array so we don't have to think about inserting entries into lists. Check into this for later?
+
         newHairs = [[0 for i in range(totalNumberSubdivisions(hairLength, hairSubD))] for j in range(len(guides))]
+        #update value of hair length
+#         hairLength = len(newHairs[0])
+        
         #For each pair of guide points, send four relevant points to the interpolator
-        newGuides = []
         if debug: print ("Subdivide Hair Sections")
-        for index, thisHair in enumerate(guides):
+        for jndex, thisHair in enumerate(guides):
             #This is for each hair
-            #Set up initial parameters
-            prev = 0
-            start = thisHair[0]
-            start = thisHair[1]
-            next = 0
-
-            if hairLength > 2:
-                next = thisHair[2]
-            newGuide = [start]
-            for jndex in range(0, hairLength-1):
+            
+            #add the first hair's points
+            newHairs[jndex][0] = guides[jndex][0]
+            
+            curveObject = makePolyLine("rowCurveObj", "rowCurve", thisHair)
+            #this length should be OK
+            for index in range(0, hairLength-1):
                 #interpolate a section
-                newPoints = interpolateGuidePoints(prev, start, end, next, hairObj.hnSubdivideHairSections)
+                knot1 = curveObject.splines[0].bezier_points[index]
+                knot2 = curveObject.splines[0].bezier_points[index + 1]
+                handle1 = knot1.handle_right
+                handle2 = knot2.handle_left
+                newPoints = mathutils.geometry.interpolate_bezier(knot1.co, handle1, handle2, knot2.co, hairSubD+2)
+#                 newPoints = interpolateGuidePoints(prev, start, end, next, hairObj.hnSubdivideHairSections)
+                
+                #add new points to the matrix
+                #interpolate_bezier includes the endpoints so, for now, skip over them. re-write later to be a cleaner algorithm
+                for kndex in range(0, len(newPoints)-2):
+                    newHairs[jndex][1+kndex+index*(1+hairSubD)] = newPoints[kndex+1]
+                    if debug: print("newHairs[", jndex, "][" , 1+kndex+index*(1+hairSubD), "] = ", newPoints[kndex], "SubD")
+                    
+                #add the end point
+                newHairs[jndex][(index+1)*(hairSubD+1)] = guides[jndex][index + 1]
+                if debug: print("newHairs[", jndex, "][" , (index+1)*(hairSubD+1), "] = ", newPoints[kndex], "SubD")
+            #clean up the curve we created
+            bpy.data.curves.remove(curveObject)
 
-                #insert new points into list of existing points.
-                newGuide.extend(newPoints)
-                newGuide.append(end)
-
-                #Advance parameters
-                prev = start
-                start = end
-                end = next
-                next = 0
-                if (jndex + 1 < hairLength):
-                    next = thisHair[jndex+1]
-
-            newGuides.append(newGuide)
+        guides = newHairs
 
     return guides
 
@@ -715,6 +713,7 @@ class HairNet (bpy.types.Operator):
     bl_description = "Makes hair guides from mesh edges."
 
     meshKind = StringProperty()
+    targetHead = BoolProperty()
 
     headObj = 0
     hairObjList = []
@@ -726,12 +725,20 @@ class HairNet (bpy.types.Operator):
 
 
     def execute(self, context):
-
-
+        '''
+        To make it possible to have either proxy objects or head objects grow hair,
+        references to self.headObj will have to be changed to a generic target object.
+        This object will have to be set in each iteration of the for loop for proxies
+        but only needs to be set once for a head. 
+        '''
+        
 
         error = 0   #0 = All good
                     #1 = Hair guides have different lengths
                     #2 = No seams in hair object
+                    
+        targetObject = self.headObj
+        
         for thisHairObj in self.hairObjList:
             options = [
                        0,                   #0 the hair system's previous settings - not used?
@@ -865,10 +872,23 @@ class HairNet (bpy.types.Operator):
 #             return {'CANCELLED'}
 
         self.headObj = bpy.context.object
+        
+        #if the last object selected is not flagged as a hair proxy, then assume we are creating hair on a head
+        #Otherwise, each proxy will grow its own hair
+        
+        if self.headObj.hnIsEmitter:
+            self.targetHead=True
+        else:
+            self.targetHead=False
+            
 
         #Get a list of hair objects
-        self.hairObjList = bpy.context.selected_objects
-        self.hairObjList.remove(self.headObj)
+#         self.hairObjList = bpy.context.selected_objects
+#         self.hairObjList.remove(self.headObj)
+        self.hairObjList = []
+        for obj in bpy.context.selected_objects:
+            if not obj.hnIsEmitter:
+                self.hairObjList.append(obj)
 
         return self.execute(context)
 
@@ -877,7 +897,7 @@ class HairNetPanel(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.4.8 Dev"
+    bl_label = "HairNet 0.4.9 Dev"
 
 
 
