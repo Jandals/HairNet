@@ -11,7 +11,7 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,4,9),
+        "version": (0,4,10),
         "blender": (2,7,1),
         "location": "Properties",
         "category": "Particle",
@@ -241,17 +241,15 @@ def getNextVertInEdge(edge, vert):
         return edge.vertices[0]
 
 def makeNewHairSystem(headObject,systemName):
-    '''Need to preserve, change, and restore the selection so that particle systems are created on the right object.'''
-    print("Make new hair on ", headObject.name)
-    print("Active is ", bpy.context.scene.objects.active.name)
     bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.context.scene.objects.active.modifiers.new("psys name", 'PARTICLE_SYSTEM')
-#     bpy.ops.object.particle_system_add()
-#     bpy.context.scene.objects.active.particle_systems[0].name = systemName
-    #this SHOULD always use the newest system
-#     headObject.particle_systems[-1].name = systemName
-#     headObject.particle_systems.active.name = systemName
-#     return headObject.particle_systems[-1]
+    #Adding a particle modifier also works but requires pushing/pulling the active object and selection. 
+    headObject.modifiers.new("HairNet", 'PARTICLE_SYSTEM')
+
+    #Set up context override
+#    override = {"object": headObject, "particle_system": systemName}
+#    bpy.ops.object.particle_system_add(override)
+    headObject.particle_systems[-1].name = systemName
+    return headObject.particle_systems[systemName]
 
 def makePolyLine(objName, curveName, cList):
     #objName and curveName are strings cList is a list of vectors
@@ -300,6 +298,11 @@ def restoreSelection(storedActive, storedSelected):
     for sel in storedSelected:
         sel.select = True
 
+def removeParticleSystem(object, particleSystem):
+    override = {"object": object, "particle_system": particleSystem}
+    bpy.ops.object.particle_system_remove(override)
+    
+    
 def sortEdges(edgesList):
     sorted = []
     debPrintEdgeKeys(edgesList)
@@ -390,25 +393,11 @@ class HairNet (bpy.types.Operator):
     def poll(self, context):
         return(context.mode == 'OBJECT')
 
-    
-
     def execute(self, context):
-        '''
-        To make it possible to have either proxy objects or head objects grow hair,
-        references to self.headObj will have to be changed to a generic target object.
-        This object will have to be set in each iteration of the for loop for proxies
-        but only needs to be set once for a head. 
-        '''
-        
-        '''
-        If hair systems are applied to a head object, the code works.
-        If each proxy object is to receive its own hair system, the selection will need to be modified for each iteration of the for loop.
-        '''
-        
-
         error = 0   #0 = All good
                     #1 = Hair guides have different lengths
                     #2 = No seams in hair object
+                    #3 = Bevel on curve object
                     
         targetObject = self.headObj
         
@@ -421,17 +410,10 @@ class HairNet (bpy.types.Operator):
                        ]
             #A new hair object gets a new guides list
             hairGuides = []
-            
-            print("Active1=", bpy.context.scene.objects.active.name)
-            
+                        
             if not self.targetHead:
                 targetObject = thisHairObj
-                storedActive, storedSelected = changeSelection(targetObject)
-#                 return{'FINISHED'}
-                print("Active2=", bpy.context.scene.objects.active.name)
 
-            print("Target=", targetObject.name)
-            print("******Start Here*******")
             sysName = ''.join(["HN", thisHairObj.name])
 
             if sysName in targetObject.particle_systems:
@@ -448,7 +430,7 @@ class HairNet (bpy.types.Operator):
                     #Get active_index of desired particle system
                     bpy.context.object.particle_systems.active_index = bpy.context.object.particle_systems.find(sysName)
                     #Delete Particle System
-                    bpy.ops.object.particle_system_remove()
+                    removeParticleSystem(targetObject, targetObject.particle_systems[sysName])
                     #Delete Particle System Settings
                     bpy.data.particles.remove(delSet)
                     #Copy Hair settings from master.
@@ -462,13 +444,13 @@ class HairNet (bpy.types.Operator):
 #                     options[2] = self.headObj.particle_systems[sysName]
 
                 '''_T_S create new and out'''
-                makeNewHairSystem(targetObject,sysName)
-                print(targetObject.particle_systems)
-                targetObject.particle_systems[-1].name = sysName
-                options[2] = targetObject.particle_systems[-1]
+                options[2] = makeNewHairSystem(targetObject,sysName)
+#                 print(targetObject.particle_systems)
+#                 targetObject.particle_systems[-1].name = sysName
+#                 options[2] = targetObject.particle_systems[-1]
 
-            if not self.targetHead:
-                restoreSelection(storedActive, storedSelected)
+#             if not self.targetHead:
+#                 restoreSelection(storedActive, storedSelected)
             
             if (self.meshKind=="SHEET"):
                 print("Hair sheet "+ thisHairObj.name)
@@ -535,12 +517,11 @@ class HairNet (bpy.types.Operator):
                 if error == 1:
                     self.report(type = {'ERROR'}, message = "Mesh guides have different lengths")
                 if error == 2:
-                    self.report(type = {'ERROR'}, message = "No seams were defined")
+                    self.report(type = {'ERROR'}, message = ("No seams were defined in " + targetObject.name))
+                    removeParticleSystem(targetObject, options[2])
                 if error == 3:
                     self.report(type = {'ERROR'}, message = "Cannot create hair from curves with a bevel object")
                 return{'CANCELLED'}
-
-            #debPrintLoc(func="Execute 2")
 
             #Subdivide hairs
             hairGuides = self.subdivideGuideHairs(hairGuides, thisHairObj)
@@ -548,7 +529,6 @@ class HairNet (bpy.types.Operator):
             #Create the hair guides on the hair object
             self.createHair(targetObject, hairGuides, options)
 
-        #debPrintLoc(func="Execute 3")
         return {'FINISHED'}
 
     def invoke (self, context, event):
@@ -568,8 +548,6 @@ class HairNet (bpy.types.Operator):
             
 
         #Get a list of hair objects
-#         self.hairObjList = bpy.context.selected_objects
-#         self.hairObjList.remove(self.headObj)
         self.hairObjList = []
         for obj in bpy.context.selected_objects:
             if not obj.hnIsEmitter:
@@ -642,7 +620,7 @@ class HairNet (bpy.types.Operator):
             pset.use_render_emitter = False
     
         # Disconnect hair and switch to particle edit mode
-        #bpy.ops.particle.disconnect_hair(all=True)
+        
     
         # Set all hair-keys
 #         dt = 100.0/(nSteps-1)
@@ -657,8 +635,9 @@ class HairNet (bpy.types.Operator):
         bpy.context.scene.tool_settings.particle_edit.use_preserve_root = False
         bpy.context.scene.tool_settings.particle_edit.use_preserve_length = False
         
+        bpy.ops.particle.disconnect_hair(all=True)
         #Connecting and disconnecting hair causes them to jump when other particle systems are created.
-        #bpy.ops.particle.connect_hair(all=True)
+        bpy.ops.particle.connect_hair(all=True)
     
         for m in range(nGuides):
             #print("Working on guide #", m)
@@ -872,7 +851,7 @@ class HairNetPanel(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.4.9 Dev"
+    bl_label = "HairNet 0.4.10"
 
 
 
