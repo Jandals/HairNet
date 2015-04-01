@@ -11,7 +11,7 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,4,10),
+        "version": (0,4,11),
         "blender": (2,7,1),
         "location": "Properties",
         "category": "Particle",
@@ -403,7 +403,7 @@ class HairNet (bpy.types.Operator):
         
         for thisHairObj in self.hairObjList:
             options = [
-                       0,                   #0 the hair system's previous settings - not used?
+                       0,                   #0 the hair system's previous settings
                        thisHairObj,         #1 The hair object
                        0,                   #2 The hair system. So we don't have to rely on the selected system
                        self.targetHead      #3 Target a head object?
@@ -417,7 +417,7 @@ class HairNet (bpy.types.Operator):
             sysName = ''.join(["HN", thisHairObj.name])
 
             if sysName in targetObject.particle_systems:
-                #if this proxy object is not tied to a master style, preserve its current settings
+                #if this proxy object has an existing hair system on the target object, preserve its current settings
                 if thisHairObj.hnMasterHairSystem == "":
                     '''_TS Preserve and out'''
                     options[0] = targetObject.particle_systems[sysName].settings
@@ -438,6 +438,7 @@ class HairNet (bpy.types.Operator):
 
                     options[2] = makeNewHairSystem(targetObject,sysName)
             else:
+                #Create a new hair system
                 if thisHairObj.hnMasterHairSystem != "":
                     '''T_S copy, create new and out'''
                     options[0] = bpy.data.particles[thisHairObj.hnMasterHairSystem].copy()
@@ -481,7 +482,8 @@ class HairNet (bpy.types.Operator):
                 tempSelected = []
                 tempSelected.append(bpy.context.selected_objects[0])
                 tempSelected.append(bpy.context.selected_objects[1])
-                hairObj = bpy.context.selected_objects[0]
+                #hairObj = bpy.context.selected_objects[0]
+                hairObj = thisHairObj
                 bpy.ops.object.select_all(action='DESELECT')
 
                 if hairObj.data.bevel_object != None:
@@ -498,7 +500,7 @@ class HairNet (bpy.types.Operator):
                 print("Hair Fibers: ", fiberObj.name)
                 print("Hair Curves: ", hairObj.name)
 
-                hairGuides = fibersToGuides(fiberObj)
+                hairGuides = self.fibersToGuides(fiberObj)
 
                 bpy.ops.object.delete(use_global=False)
 
@@ -578,20 +580,18 @@ class HairNet (bpy.types.Operator):
         # Create hair particle system if  needed
         #bpy.ops.object.mode_set(mode='OBJECT')
         #bpy.ops.object.particle_system_add()
-        '''
-        psys = ob.particle_systems.active
-        '''
+
         psys = options[2]
     
         # Particle settings
         pset = psys.settings
     
         if options[0] != 0:
-            '''Use existing settings'''
+            #Use existing settings
             psys.settings = options[0]
             pset = options[0]
         else:
-    
+            #Create new settings
             pset.type = 'HAIR'
     
             pset.emit_from = 'FACE'
@@ -679,7 +679,7 @@ class HairNet (bpy.types.Operator):
     
     def fibersToGuides(self, hairObj):
         guides = []
-        hairs = getHairsFromFibers(hairObj)
+        hairs = self.getHairsFromFibers(hairObj)
     
         for hair in hairs:
             guide = []
@@ -851,7 +851,7 @@ class HairNetPanel(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.4.10"
+    bl_label = "HairNet 0.4.11"
 
 
 
