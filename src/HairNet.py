@@ -11,8 +11,8 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,4,11),
-        "blender": (2,7,1),
+        "version": (0,5,0),
+        "blender": (2,7,4),
         "location": "Properties",
         "category": "Particle",
         "description": "Creates a particle hair system with hair guides from mesh edges which start at marked seams.",
@@ -322,49 +322,83 @@ def sortLoop(obj, vloop, v1, seamEdges, vert_edges):
     return loop
 
 def sortSeamVerts(verts, edges):
-    debug = False
+
+    debug = True
     sortedVerts = []
     usedEdges = []
+    triedVerts = []
+    triedEdges = []
+    startingVerts = []
     
-    for thisVert in verts:
-        count = 0
-        for thisEdge in edges:
-            if thisVert in thisEdge.key:
-                beginEdge = thisEdge
-                count = count + 1
-                if count > 1:
-                    break
-        if count == 1:
-            break
-    #at this point, we have found an endpoint
-    if debug:
-        print("seam endpoint", thisVert)
-        print("ending edge", beginEdge.key)
-    #get the edge the vert is in
-    #for thisEdge in edges:
+    #Make a list of starting points so that each island will have a starting point. Make another "used edges" list
     
-    thisEdge = beginEdge   
+    def findEndpoint(vert):
+        for thisVert in verts:
+            count = 0
+            if thisVert not in triedVerts:
+                triedVerts.append(thisVert)
+                #get all edges with thisVert in it
+                all_edges = [e for e in edges if thisVert in e.vertices]
+
+                if len(all_edges) == 1:
+                    #The vert is in only one edge and is thus an endpoint
+                    startingVerts.append(thisVert)
+                    #walk to the other end of the seam and add verts to triedVerts
+                    walking = True
+                    thatVert = thisVert
+                    beginEdge = thatEdge = all_edges[0]
+                    while walking:
+                        #get the other vert in the edge
+                        if thatVert == thatEdge.key[0]:
+                            thatVert = thatEdge.key[1]
+                        else:
+                            thatVert = thatEdge.key[0]
+                        #Add current edge to triedEdges
+                        triedEdges.append(thatEdge)
+                        if thatVert not in triedVerts: triedVerts.append(thatVert)
+                        #Put next edge in thatEdge
+                        nextEdge = [e for e in edges if thatVert in e.vertices and e not in triedEdges]
+                        if len(nextEdge) == 1:
+                            #This means one edge was found that wasn't already used
+                            thatEdge = nextEdge[0]
+                        else:
+                            #No unused edges were found
+                            walking = False
+                            
+    #                 break
+        #at this point, we have found an endpoint
+        if debug:
+            print("seam endpoint", thisVert)
+            print("ending edge", beginEdge.key)
+        #get the edge the vert is in
+        #for thisEdge in edges:
+        return beginEdge, thisVert
     
-    sortedVerts.append(thisVert)
+    for aVert in verts:
+        if aVert not in triedVerts:
+            thisEdge, thisVert = findEndpoint(aVert)  
+    
     #Now, walk through the edges to put the verts in the right order
-#     for newVert in thisEdge.key:
-    keepRunning = True
-    while keepRunning:
-        for newVert in thisEdge.key:
-            if debug: print("next vert is #", newVert)
-            if thisVert != newVert:
-                #we have found the other vert if this edge
-                #store it and find the next edge
-                thisVert = newVert
-                sortedVerts.append(thisVert)
-    #             edges.remove(thisEdge)
-                usedEdges.append(thisEdge)
-                break
-        try:
-            thisEdge = [x for x in edges if ((thisVert in x.key) and (x not in usedEdges))][0]
-        except:
-            keepRunning = False
-        if debug: print("next vert is in edge", thisEdge.key)
+
+    for thisVert in startingVerts:
+        thisEdge = [x for x in edges if (thisVert in x.key)][0]
+        sortedVerts.append(thisVert)
+        keepRunning = True
+        while keepRunning:
+            for newVert in thisEdge.key:
+                if debug: print("next vert is #", newVert)
+                if thisVert != newVert:
+                    #we have found the other vert if this edge
+                    #store it and find the next edge
+                    thisVert = newVert
+                    sortedVerts.append(thisVert)
+                    usedEdges.append(thisEdge)
+                    break
+            try:
+                thisEdge = [x for x in edges if ((thisVert in x.key) and (x not in usedEdges))][0]
+            except:
+                keepRunning = False
+            if debug: print("next vert is in edge", thisEdge.key)
                 
                 
         
@@ -387,6 +421,7 @@ class HairNet (bpy.types.Operator):
     targetHead = False
     headObj = 0
     hairObjList = []
+    hairProxyList = []
 
     @classmethod
 
@@ -411,7 +446,8 @@ class HairNet (bpy.types.Operator):
             #A new hair object gets a new guides list
             hairGuides = []
                         
-            if not self.targetHead:
+            #if not self.targetHead:
+            if thisHairObj.hnIsEmitter:
                 targetObject = thisHairObj
 
             sysName = ''.join(["HN", thisHairObj.name])
@@ -446,18 +482,13 @@ class HairNet (bpy.types.Operator):
 
                 '''_T_S create new and out'''
                 options[2] = makeNewHairSystem(targetObject,sysName)
-#                 print(targetObject.particle_systems)
-#                 targetObject.particle_systems[-1].name = sysName
-#                 options[2] = targetObject.particle_systems[-1]
-
-#             if not self.targetHead:
-#                 restoreSelection(storedActive, storedSelected)
             
             if (self.meshKind=="SHEET"):
                 print("Hair sheet "+ thisHairObj.name)
                 #Create all hair guides
                 #for hairObj in self.hairObjList:
                 #Identify the seams and their vertices
+                #Start looking here for multiple mesh problems.
                 seamVerts, seamEdges, error = getSeams(thisHairObj)
                 
                 if(error == 0):
@@ -467,9 +498,8 @@ class HairNet (bpy.types.Operator):
                         edgeLoops, vert_edges, edge_faces = getLoops(thisHairObj, thisHairObj.data.vertices[thisVert], vert_edges, edge_faces, seamEdges)
                         '''Is loopsToGuides() adding to the count of guides instead of overwriting?'''
                         hairGuides = self.loopsToGuides(thisHairObj, edgeLoops, hairGuides)
-                    #debPrintHairGuides(hairGuides)
+                    debPrintHairGuides(hairGuides)
                     #Take each edge loop and extract coordinate data from its verts
-                    #hairGuides = createHairGuides(hairObj, edgeLoops)
 
             if (self.meshKind=="FIBER"):
                 hairObj = self.hairObjList[0]
@@ -537,10 +567,17 @@ class HairNet (bpy.types.Operator):
 
         self.headObj = bpy.context.object
         
-        #if the last object selected is not flagged as a hair proxy, then assume we are creating hair on a head
+        #Get a list of hair objects
+        self.hairObjList = []
+        for obj in bpy.context.selected_objects:
+            if obj != self.headObj or obj.hnIsEmitter:
+                self.hairObjList.append(obj)
+                
+        
+        #if the last object selected is not flagged as a self-emitter, then assume we are creating hair on a head
         #Otherwise, each proxy will grow its own hair
         
-        if self.headObj.hnIsEmitter:
+        if not self.headObj.hnIsEmitter:
             self.targetHead=True
             if len(bpy.context.selected_objects) < 2:
                 self.report(type = {'ERROR'}, message = "Selection too small. Please select two objects")
@@ -549,11 +586,7 @@ class HairNet (bpy.types.Operator):
             self.targetHead=False
             
 
-        #Get a list of hair objects
-        self.hairObjList = []
-        for obj in bpy.context.selected_objects:
-            if not obj.hnIsEmitter:
-                self.hairObjList.append(obj)
+        
 
         return self.execute(context)
     
@@ -568,14 +601,17 @@ class HairNet (bpy.types.Operator):
         return 0
     
     def createHair(self, ob, guides, options):
-    
+        debug = False
+        
         tempActive = bpy.context.scene.objects.active
         bpy.context.scene.objects.active = ob
+        
+        if debug: print("Active Object: ", bpy.context.scene.objects.active.name)
     
         nGuides = len(guides)
-        #print("nGguides", nGuides)
+        if debug: print("nGguides", nGuides)
         nSteps = len(guides[0])
-        #print("nSteps", nSteps)
+        if debug: print("nSteps", nSteps)
     
         # Create hair particle system if  needed
         #bpy.ops.object.mode_set(mode='OBJECT')
@@ -779,13 +815,7 @@ class HairNet (bpy.types.Operator):
     
         #number of hairs added between existing hairs
         hairSprouts = hairObj.hnSproutHairs
-        #number of points added per hair section
-#         hairSubD = hairObj.hnSubdivideHairSections
-    
-        #start with a matrix of the size of the subdivided hair grid
-        #newHairs is a list of hairs. Each hair is a list of points
-    #     newHairs = [[0 for i in range(totalNumberSubdivisions(hairLength, hairSubD))] for j in range(totalNumberSubdivisions(numberHairs, hairSprouts))]
-    
+        
         #subdivide hairs
         if hairObj.hnSproutHairs > 0:
             #initialize an empty array so we don't have to think about inserting entries into lists. Check into this for later?
@@ -865,9 +895,6 @@ class HairNetPanel(bpy.types.Panel):
 
         layout = self.layout
 
-#         layout.operator("particle.hairnet", text="Add Hair From Sheets").meshKind="SHEET"
-#         layout.operator("particle.hairnet", text="Add Hair From Fibers").meshKind="FIBER"
-#         layout.operator("particle.hairnet", text="Add Hair From Curves").meshKind="CURVE"
         row = layout.row()
         row.label("Objects Start here")
 
@@ -876,16 +903,12 @@ class HairNetPanel(bpy.types.Panel):
         row = layout.row()
         try:
 #             row.prop(self.headObj, 'hnIsHairProxy', text = "Hair Proxy")
-            row.prop(self.headObj, 'hnIsEmitter', text = "Hair Emitter")
+            row.prop(self.headObj, 'hnIsEmitter', text = "Emit Hair on Self")
         except:
             pass
 
-#         print(self.headObj.hnIsHairProxy)
-#         row = layout.row()
-#         row.label(str(len(self.hairObjList)) + " hair objects"  )
-
-        #Draw this if this is a hair emitter object
-        if self.headObj.hnIsEmitter:
+        #Draw this if this is a head object
+        if not self.headObj.hnIsEmitter:
             box = layout.box()
             row = box.row()
             row.label("Hair Object:")
@@ -901,7 +924,7 @@ class HairNetPanel(bpy.types.Panel):
             
 
 
-        #Draw this if it's a proxy object
+        #Draw this if it's a self-emitter object
         else:
             box = layout.box()
             try:
