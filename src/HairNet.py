@@ -11,7 +11,7 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,5,0),
+        "version": (0,5,1),
         "blender": (2,7,4),
         "location": "Properties",
         "category": "Particle",
@@ -504,7 +504,7 @@ class HairNet (bpy.types.Operator):
             if (self.meshKind=="FIBER"):
                 hairObj = self.hairObjList[0]
                 print("Hair fiber")
-                hairGuides = fibersToGuides(hairObj)
+                hairGuides = self.fibersToGuides(hairObj)
 
             if (self.meshKind=="CURVE"):
                 #Preserve Active and selected objects
