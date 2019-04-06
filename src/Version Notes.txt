@@ -1,5 +1,5 @@
 0.4.6
-Fixed an issue which cause hairs to jump out of place when a second or third… hair system is created. The solution was to remove the commands to connect and disconnect the hair system(s).
+Fixed an issue which cause hairs to jump out of place when a second or third√â hair system is created. The solution was to remove the commands to connect and disconnect the hair system(s).
 Changed the behavior of Execute() to pass an existing hair system's name to createHair() so that users don't need to manually select the proper particle system.
 
 0.4.7
@@ -15,4 +15,7 @@ Hair systems can now be applied to a proxy mesh as well as to a head object. The
 Undid the change to using operator overrides for creating particle systems. It was being done incorrectly and I can't find the proper way to do it.
 
 0.4.11
-Restored Making hair from curves. 
+Restored Making hair from curves.
+
+0.4.12
+Updated to work with the Blender 2.8 API
