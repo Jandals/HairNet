@@ -1,6 +1,7 @@
 #---------------------------------------------------
 # File HairNet.py
 # Written by Rhett Jackson April 1, 2013
+# Updated by Nicholas Sprake-Jones April 6, 2019
 # Some routines were copied from "Curve Loop" by Crouch https://sites.google.com/site/bartiuscrouch/scripts/curveloop
 # Some routines were copied from other sources
 # Very limited at this time:
@@ -11,8 +12,8 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,5,1),
-        "blender": (2,7,4),
+        "version": (0,6,0),
+        "blender": (2,8,0),
         "location": "Properties",
         "category": "Particle",
         "description": "Creates a particle hair system with hair guides from mesh edges which start at marked seams.",
@@ -23,7 +24,7 @@ bl_info = {
 import bpy
 import mathutils
 from mathutils import Vector
-from bpy.utils import register_module, unregister_module
+#from bpy.utils import register_module, unregister_module
 from bpy.props import *
 
 bpy.types.Object.hnMasterHairSystem=StringProperty(
@@ -286,17 +287,21 @@ def changeSelection(thisObject):
     storedActive, storedSelected = preserveSelection()
     
     bpy.ops.object.select_all(action='DESELECT')
-    bpy.context.scene.objects.active=thisObject
-    thisObject.select=True
+    #bpy.context.scene.objects.active=thisObject
+    #thisObject.select=True
+    bpy.context.view_layer.objects.active=thisObject    # 2.8
+    thisObject.select_set(action='SELECT')    # 2.8
     
     return storedActive, storedSelected
     
 def restoreSelection(storedActive, storedSelected):
     #Restore active object and selection
-    bpy.context.scene.objects.active=storedActive
+    #bpy.context.scene.objects.active=storedActive
+    bpy.context.view_layer.objects.active=storedActive    #2.8
     bpy.ops.object.select_all(action='DESELECT')
     for sel in storedSelected:
-        sel.select = True
+        #sel.select = True
+        sel.select_set(action='SELECT')    # 2.8
 
 def removeParticleSystem(object, particleSystem):
     override = {"object": object, "particle_system": particleSystem}
@@ -520,8 +525,10 @@ class HairNet (bpy.types.Operator):
                     error = 3
 
 
-                bpy.context.scene.objects.active=hairObj
-                hairObj.select=True
+                #bpy.context.scene.objects.active=hairObj
+                #hairObj.select=True
+                bpy.context.view_layer.objects.active=hairObj    # 2.8
+                hairObj.select_set(action='SELECT')    # 2.8
 
                 print("Curve Head: ", headObj.name)
                 bpy.ops.object.convert(target='MESH', keep_original=True)
@@ -535,7 +542,8 @@ class HairNet (bpy.types.Operator):
                 bpy.ops.object.delete(use_global=False)
 
                 #Restore active object and selection
-                bpy.context.scene.objects.active=tempActive
+                #bpy.context.scene.objects.active=tempActive
+                bpy.context.view_layer.objects.active=tempActive    # 2.8
                 bpy.ops.object.select_all(action='DESELECT')
                 for sel in tempSelected:
                     sel.select = True
@@ -603,10 +611,13 @@ class HairNet (bpy.types.Operator):
     def createHair(self, ob, guides, options):
         debug = False
         
-        tempActive = bpy.context.scene.objects.active
-        bpy.context.scene.objects.active = ob
+        #tempActive = bpy.context.scene.objects.active
+        #bpy.context.scene.objects.active = ob
+        tempActive = bpy.context.view_layer.objects.active    # 2.8
+        bpy.context.view_layer.objects.active = ob    # 2.8
         
-        if debug: print("Active Object: ", bpy.context.scene.objects.active.name)
+        #if debug: print("Active Object: ", bpy.context.scene.objects.active.name)
+        if debug: print("Active Object: ", bpy.context.view_layer.objects.active.name)    # 2.8
     
         nGuides = len(guides)
         if debug: print("nGguides", nGuides)
@@ -697,7 +708,8 @@ class HairNet (bpy.types.Operator):
         bpy.ops.particle.particle_edit_toggle()
     
     
-        bpy.context.scene.objects.active = tempActive
+        #bpy.context.scene.objects.active = tempActive
+        bpy.context.view_layer.objects.active = tempActive    # 2.8
         return
     
     def createHairGuides(self, obj, edgeLoops):
@@ -949,16 +961,20 @@ class HairNetPanel(bpy.types.Panel):
         row.operator("particle.hairnet", text="Add Hair From Curves").meshKind="CURVE"
         
         
-
-
+# 2.8 moved the register/unregister section from the top
 def register():
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)
+        
     unregister_module(__name__)
     register_module(__name__)
 
-
-
-
 def unregister():
+    from bpy.utils import unregister_class
+    for cls in reversed(classes):
+        unregister_class(cls)
+        
     unregister_module(__name__)
 
 if __name__ == '__main__':
