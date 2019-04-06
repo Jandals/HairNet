@@ -17,8 +17,5 @@ Undid the change to using operator overrides for creating particle systems. It w
 0.4.11
 Restored Making hair from curves.
 
-0.4.12
-Updated to work with the Blender 2.8 API
-
 0.6.0
 Updated to work with the Blender 2.8 API
