@@ -286,7 +286,7 @@ def changeSelection(thisObject):
     
     bpy.ops.object.select_all(action='DESELECT')
     bpy.context.view_layer.objects.active=thisObject
-    thisObject.select=True
+    thisObject.select_set(state=True)
     
     return storedActive, storedSelected
     
@@ -520,7 +520,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
 
 
                 bpy.context.view_layer.objects.active=hairObj
-                hairObj.select=True
+                hairObj.select_set(state=True)
 
                 print("Curve Head: ", headObj.name)
                 bpy.ops.object.convert(target='MESH', keep_original=True)
