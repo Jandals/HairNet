@@ -1,3 +1,8 @@
+# Attention:
+HairNet does not yet work in Blender 2.80. It appears than a bug in Blender is keeping it from working. It should be resolved but there's no way to set a schedule for when.
+
+HairNet for 2.79 still works.
+
 # HairNet
 HairNet addon for Blender
 
