@@ -888,12 +888,12 @@ class HairNet (bpy.types.Operator):
     
         return guides
 
-class HairNetPanel(bpy.types.Panel):
+class HAIRNET_PT_panel(bpy.types.Panel):
     bl_idname = "PARTICLE_PT_HairNet"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.4.11"
+    bl_label = "HairNet {0}.{1}.{2}".format(bl_info["version"][0], bl_info["version"][1], bl_info["version"][2])
 
 
 
@@ -908,7 +908,7 @@ class HairNetPanel(bpy.types.Panel):
         layout = self.layout
 
         row = layout.row()
-        row.label("Objects Start here")
+        row.label(text = "Objects Start here")
 
         '''Is this a hair object?'''
 
@@ -923,8 +923,8 @@ class HairNetPanel(bpy.types.Panel):
         if not self.headObj.hnIsEmitter:
             box = layout.box()
             row = box.row()
-            row.label("Hair Object:")
-            row.label("Master Hair System:")
+            row.label(text = "Hair Object:")
+            row.label(text = "Master Hair System:")
             for thisHairObject in self.hairObjList:
                 row = box.row()
                 row.prop_search(thisHairObject, 'hnMasterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
@@ -943,7 +943,7 @@ class HairNetPanel(bpy.types.Panel):
                 
                 
                 row = box.row()
-                row.label("Master Hair System")
+                row.label(text = "Master Hair System")
                 row = box.row()
                 row.prop_search(self.headObj, 'hnMasterHairSystem',  bpy.data, "particles", text = self.headObj.name)
 
@@ -965,7 +965,7 @@ class HairNetPanel(bpy.types.Panel):
 
 classes = (
 	HairNet,
-	HairNetPanel,
+	HAIRNET_PT_panel,
 )
 
 def register():
