@@ -13,7 +13,7 @@ bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
         "version": (0,6,0),
-        "blender": (2,8,0),
+        "blender": (2,80,74),
         "location": "Properties",
         "category": "Particle",
         "description": "Creates a particle hair system with hair guides from mesh edges which start at marked seams.",
@@ -962,20 +962,21 @@ class HairNetPanel(bpy.types.Panel):
         
         
 # 2.8 moved the register/unregister section from the top
+
+classes = (
+	HairNet,
+	HairNetPanel,
+)
+
 def register():
     from bpy.utils import register_class
     for cls in classes:
-        register_class(cls)
-        
-    unregister_module(__name__)
-    register_module(__name__)
+        bpy.utils.register_class(cls)
 
 def unregister():
     from bpy.utils import unregister_class
     for cls in reversed(classes):
-        unregister_class(cls)
-        
-    unregister_module(__name__)
-
+        bpy.utils.unregister_class(cls)
+		
 if __name__ == '__main__':
     register()
