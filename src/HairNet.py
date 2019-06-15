@@ -929,7 +929,7 @@ class HAIRNET_PT_panel(bpy.types.Panel):
                 row = box.row()
                 row.prop_search(thisHairObject, 'hnMasterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
                 row = box.row()
-                row.label("Guide Subdivisions:")
+                row.label(text = "Guide Subdivisions:")
                 row.prop(thisHairObject, 'hnSproutHairs', text = "Subdivide U")
 #                 row.prop(thisHairObject, 'hnSubdivideHairSections', text = "Subdivide V")
 
@@ -950,7 +950,7 @@ class HAIRNET_PT_panel(bpy.types.Panel):
             except:
                 pass
             row = box.row()
-            row.label("Guide Subdivisions:")
+            row.label(text = "Guide Subdivisions:")
             row.prop(self.headObj, 'hnSproutHairs', text = "Subdivide U")
             
         row = layout.row()
