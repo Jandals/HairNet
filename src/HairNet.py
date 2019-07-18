@@ -881,7 +881,7 @@ class HairNetPanel(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.4.11"
+    bl_label = "HairNet 0.5.1"
 
 
 
