@@ -7,6 +7,7 @@
 # NB 1) After running the script to create hair, the user MUST manually enter Particle Mode on the Head object and "touch" each point of each hair guide. Using a large comb brish with very low strength is a good way to do this. If it's not done, the hair strands are likely to be reset to a default/straight-out position during editing.
 # NB 2) All meshes must have the same number of vertices in the direction that corresponds to hair growth
 #---------------------------------------------------
+from bpy import context
 
 bl_info = {
         "name":"HairNet",
@@ -62,7 +63,6 @@ def debPrintEdgeFaces(edge_faces):
         print(edge, ": ", edge_faces[edge])
         
 def debPrintEdgeKeys(edges):
-    print("edge_keys")
     for edge in edges:
         print(edge, " : ", edge.key)
 
@@ -248,6 +248,8 @@ def makeNewHairSystem(headObject,systemName):
 #    override = {"object": headObject, "particle_system": systemName}
 #    bpy.ops.object.particle_system_add(override)
     headObject.particle_systems[-1].name = systemName
+    headObject.particle_systems[-1].settings.type = 'HAIR'
+    headObject.particle_systems[-1].settings.render_step = 5
     return headObject.particle_systems[systemName]
 
 def makePolyLine(objName, curveName, cList):
@@ -428,6 +430,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         return(context.mode == 'OBJECT')
 
     def execute(self, context):
+        debug = False
         error = 0   #0 = All good
                     #1 = Hair guides have different lengths
                     #2 = No seams in hair object
@@ -440,16 +443,28 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                        0,                   #0 the hair system's previous settings
                        thisHairObj,         #1 The hair object
                        0,                   #2 The hair system. So we don't have to rely on the selected system
-                       self.targetHead      #3 Target a head object?
+                       self.targetHead,      #3 Target a head object?
+                       targetObject,         #4 targetObject
+                       "name"               #5 particle system name
                        ]
+            
+            #Get dependency graph
+            """depsgraph = bpy.context.evaluated_depsgraph_get()
+            thisHairObj = thisHairObj.evaluated_get(depsgraph)
+            options[1] = thisHairObj"""
+            
+            
             #A new hair object gets a new guides list
             hairGuides = []
                         
             #if not self.targetHead:
             if thisHairObj.hnIsEmitter:
                 targetObject = thisHairObj
+                
+            #targetObject = targetObject.evaluated_get(depsgraph)
 
             sysName = ''.join(["HN", thisHairObj.name])
+            options[5] = sysName
 
             if sysName in targetObject.particle_systems:
                 #if this proxy object has an existing hair system on the target object, preserve its current settings
@@ -483,7 +498,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                 options[2] = makeNewHairSystem(targetObject,sysName)
             
             if (self.meshKind=="SHEET"):
-                print("Hair sheet "+ thisHairObj.name)
+                if debug: print("Hair sheet "+ thisHairObj.name)
                 #Create all hair guides
                 #for hairObj in self.hairObjList:
                 #Identify the seams and their vertices
@@ -497,12 +512,12 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                         edgeLoops, vert_edges, edge_faces = getLoops(thisHairObj, thisHairObj.data.vertices[thisVert], vert_edges, edge_faces, seamEdges)
                         '''Is loopsToGuides() adding to the count of guides instead of overwriting?'''
                         hairGuides = self.loopsToGuides(thisHairObj, edgeLoops, hairGuides)
-                    debPrintHairGuides(hairGuides)
+                    if debug: debPrintHairGuides(hairGuides)
                     #Take each edge loop and extract coordinate data from its verts
 
             if (self.meshKind=="FIBER"):
                 hairObj = self.hairObjList[0]
-                print("Hair fiber")
+                if debug: print("Hair fiber")
                 hairGuides = self.fibersToGuides(hairObj)
 
             if (self.meshKind=="CURVE"):
@@ -522,12 +537,13 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                 bpy.context.view_layer.objects.active=hairObj
                 hairObj.select_set(state=True)
 
-                print("Curve Head: ", headObj.name)
+                if debug: print("Curve Head: ", headObj.name)
                 bpy.ops.object.convert(target='MESH', keep_original=True)
                 fiberObj = bpy.context.active_object
 
-                print("Hair Fibers: ", fiberObj.name)
-                print("Hair Curves: ", hairObj.name)
+                if debug:
+                    print("Hair Fibers: ", fiberObj.name)
+                    print("Hair Curves: ", hairObj.name)
 
                 hairGuides = self.fibersToGuides(fiberObj)
 
@@ -605,6 +621,8 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         tempActive = bpy.context.active_object
         bpy.context.view_layer.objects.active = ob
         
+        
+        
         if debug: print("Active Object: ", bpy.context.active_object.name)
     
         nGuides = len(guides)
@@ -617,6 +635,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         #bpy.ops.object.particle_system_add()
 
         psys = options[2]
+
     
         # Particle settings
         pset = psys.settings
@@ -627,7 +646,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
             pset = options[0]
         else:
             #Create new settings
-            pset.type = 'HAIR'
+            #pset.type = 'HAIR'
     
             pset.emit_from = 'FACE'
             ob.show_instancer_for_render = False
@@ -643,7 +662,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
             pset.child_roundness = 1.0
     
         #Rename Hair Settings
-        pset.name = ''.join([options[2].name, " Hair Settings"])
+        #pset.name = ''.join([options[2].name, " Hair Settings"])
         pset.hair_step = nSteps-1
         #This set the number of guides for the particle system. It may have to be the same for every instance of the system.
         pset.count = nGuides
@@ -655,16 +674,14 @@ class HAIRNET_OT_operator (bpy.types.Operator):
             ob.show_instancer_for_render = False
     
         # Disconnect hair and switch to particle edit mode
-        
-    
-        # Set all hair-keys
-#         dt = 100.0/(nSteps-1)
-#         dw = 1.0/(nSteps-1)
-    
+            
         # Connect hair to mesh
         # Segmentation violation during render if this line is absent.
         # Connecting hair moves the mesh points by an amount equal to the object's location
     
+        bpy.ops.particle.particle_edit_toggle()
+        bpy.context.scene.tool_settings.particle_edit.tool = 'COMB'
+        bpy.ops.particle.brush_edit(stroke=[{'name': '', 'location': (0, 0, 0), 'mouse': (0, 0), 'pressure': 0, 'size': 0, 'pen_flip': False, 'time': 0, 'is_start': False}])
         bpy.ops.particle.particle_edit_toggle()
         bpy.context.scene.tool_settings.particle_edit.use_emitter_deflect = False
         bpy.context.scene.tool_settings.particle_edit.use_preserve_root = False
@@ -673,8 +690,14 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         bpy.ops.particle.disconnect_hair(all=True)
         #Connecting and disconnecting hair causes them to jump when other particle systems are created.
         bpy.ops.particle.connect_hair(all=True)
+        
+        targetObj = options[4]
+        
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        depObj = targetObj.evaluated_get(depsgraph)
+        psys = depObj.particle_systems[options[5]]
     
-        for m in range(nGuides):
+        for m in range(0, nGuides):
             #print("Working on guide #", m)
             nSteps = len(guides[m])
             guide = guides[m]
@@ -688,11 +711,11 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                 h = part.hair_keys[n]
                 #h.co_local = point
                 h.co = point
-    #            print("#", n, " = ", point)
-    #            h.time = n*dt
-    #            h.weight = 1.0 - n*dw
-    
+                #print("h.co = ", h.co)
+    #            
         # Toggle particle edit mode
+        #bpy.ops.particle.particle_edit_toggle()
+        bpy.ops.particle.particle_edit_toggle()
         bpy.ops.particle.particle_edit_toggle()
     
     
@@ -901,7 +924,6 @@ class HAIRNET_PT_panel(bpy.types.Panel):
 
         row = layout.row()
         try:
-#             row.prop(self.headObj, 'hnIsHairProxy', text = "Hair Proxy")
             row.prop(self.headObj, 'hnIsEmitter', text = "Emit Hair on Self")
         except:
             pass
@@ -920,15 +942,10 @@ class HAIRNET_PT_panel(bpy.types.Panel):
                 row.prop(thisHairObject, 'hnSproutHairs', text = "Subdivide U")
 #                 row.prop(thisHairObject, 'hnSubdivideHairSections', text = "Subdivide V")
 
-            
-
-
         #Draw this if it's a self-emitter object
         else:
             box = layout.box()
             try:
-                
-                
                 row = box.row()
                 row.label(text = "Master Hair System")
                 row = box.row()
@@ -940,15 +957,82 @@ class HAIRNET_PT_panel(bpy.types.Panel):
             row.label(text = "Guide Subdivisions:")
             row.prop(self.headObj, 'hnSproutHairs', text = "Subdivide U")
             
-        row = layout.row()
+
+class HAIRNET_PT_view_panel(bpy.types.Panel):
+    bl_idname = "PARTICLE_PT_HairNet_view_panel"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_label = "HairNet"
+    bl_category = "HNet"
+    
+    def draw(self, context):
+        object = context.active_object
+        if object is not None:
+            self.drawButtons(self.layout)
+            self.drawDetails(self.layout, context)
+        
+    def drawButtons(self, layout):
+        col = layout.box().column(align = True)
+        row = col.row(align = True)
+        row.label(text="Make Hair")
+        row = col.row()
         row.operator("particle.hairnet", text="Add Hair From Sheets").meshKind="SHEET"
-        row = layout.row()
+        row = col.row()
         row.operator("particle.hairnet", text="Add Hair From Fibers").meshKind="FIBER"
-        row = layout.row()
+        row = col.row()
         row.operator("particle.hairnet", text="Add Hair From Curves").meshKind="CURVE"
         
+    def drawDetails(self, layout, context):
+        self.headObj = context.object
+
+        #Get a list of hair objects
+        self.hairObjList = context.selected_objects
+        self.hairObjList.remove(self.headObj)
+
+        layout = self.layout
+
+        row = layout.row()
+        #row.label(text = "Objects Start here")
+
+        '''Is this a hair object?'''
+
+        row = layout.row()
+        try:
+            row.prop(self.headObj, 'hnIsEmitter', text = "Emit Hair on Self")
+        except:
+            pass
+
+        #Draw this if this is a head object
+        if not self.headObj.hnIsEmitter:
+            box = layout.box()
+            row = box.row()
+            row.label(text = "Hair Object:")
+            row.label(text = "Use Settings:")
+            for thisHairObject in self.hairObjList:
+                row = box.row()
+                row.prop_search(thisHairObject, 'hnMasterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
+                row = box.row()
+                row.label(text = "Add Guides:")
+                row.prop(thisHairObject, 'hnSproutHairs', text = "SubD")
+#                 row.prop(thisHairObject, 'hnSubdivideHairSections', text = "Subdivide V")
+
+        #Draw this if it's a self-emitter object
+        else:
+            box = layout.box()
+            try:
+                row = box.row()
+                row.label(text = "Use Settings")
+                row = box.row()
+                row.prop_search(self.headObj, 'hnMasterHairSystem',  bpy.data, "particles", text = self.headObj.name)
+
+            except:
+                pass
+            row = box.row()
+            row.label(text = "Guide Subdivisions:")
+            row.prop(self.headObj, 'hnSproutHairs', text = "SubD")
         
-classes = (HAIRNET_OT_operator, HAIRNET_PT_panel)
+    
+classes = (HAIRNET_OT_operator, HAIRNET_PT_panel, HAIRNET_PT_view_panel)
 
 register, unregister = bpy.utils.register_classes_factory(classes)
 
