@@ -11,8 +11,8 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,5,1),
-        "blender": (2,7,4),
+        "version": (0,6,0),
+        "blender": (2,80,0),
         "location": "Properties",
         "category": "Particle",
         "description": "Creates a particle hair system with hair guides from mesh edges which start at marked seams.",
@@ -23,7 +23,6 @@ bl_info = {
 import bpy
 import mathutils
 from mathutils import Vector
-from bpy.utils import register_module, unregister_module
 from bpy.props import *
 
 bpy.types.Object.hnMasterHairSystem=StringProperty(
@@ -286,14 +285,14 @@ def changeSelection(thisObject):
     storedActive, storedSelected = preserveSelection()
     
     bpy.ops.object.select_all(action='DESELECT')
-    bpy.context.scene.objects.active=thisObject
-    thisObject.select=True
+    bpy.context.view_layer.objects.active=thisObject
+    thisObject.select_set(state=True)
     
     return storedActive, storedSelected
     
 def restoreSelection(storedActive, storedSelected):
     #Restore active object and selection
-    bpy.context.scene.objects.active=storedActive
+    bpy.context.view_layer.objects.active=storedActive
     bpy.ops.object.select_all(action='DESELECT')
     for sel in storedSelected:
         sel.select = True
@@ -410,13 +409,13 @@ def sortSeamVerts(verts, edges):
 def totalNumberSubdivisions(points, cuts):
     return points + (points - 1)*cuts
 
-class HairNet (bpy.types.Operator):
+class HAIRNET_OT_operator (bpy.types.Operator):
     bl_idname = "particle.hairnet"
     bl_label = "HairNet"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Makes hair guides from mesh edges."
 
-    meshKind = StringProperty()
+    meshKind : StringProperty()
     
     targetHead = False
     headObj = 0
@@ -520,8 +519,8 @@ class HairNet (bpy.types.Operator):
                     error = 3
 
 
-                bpy.context.scene.objects.active=hairObj
-                hairObj.select=True
+                bpy.context.view_layer.objects.active=hairObj
+                hairObj.select_set(state=True)
 
                 print("Curve Head: ", headObj.name)
                 bpy.ops.object.convert(target='MESH', keep_original=True)
@@ -535,7 +534,7 @@ class HairNet (bpy.types.Operator):
                 bpy.ops.object.delete(use_global=False)
 
                 #Restore active object and selection
-                bpy.context.scene.objects.active=tempActive
+                bpy.context.view_layer.objects.active=tempActive
                 bpy.ops.object.select_all(action='DESELECT')
                 for sel in tempSelected:
                     sel.select = True
@@ -603,10 +602,10 @@ class HairNet (bpy.types.Operator):
     def createHair(self, ob, guides, options):
         debug = False
         
-        tempActive = bpy.context.scene.objects.active
-        bpy.context.scene.objects.active = ob
+        tempActive = bpy.context.active_object
+        bpy.context.view_layer.objects.active = ob
         
-        if debug: print("Active Object: ", bpy.context.scene.objects.active.name)
+        if debug: print("Active Object: ", bpy.context.active_object.name)
     
         nGuides = len(guides)
         if debug: print("nGguides", nGuides)
@@ -631,7 +630,7 @@ class HairNet (bpy.types.Operator):
             pset.type = 'HAIR'
     
             pset.emit_from = 'FACE'
-            pset.use_render_emitter = False
+            ob.show_instancer_for_render = False
             pset.use_strand_primitive = True
     
             # Children
@@ -651,9 +650,9 @@ class HairNet (bpy.types.Operator):
         
         #Render the emitter object?
         if options[3]:
-            pset.use_render_emitter = True
+            ob.show_instancer_for_render = True
         else:
-            pset.use_render_emitter = False
+            ob.show_instancer_for_render = False
     
         # Disconnect hair and switch to particle edit mode
         
@@ -697,7 +696,7 @@ class HairNet (bpy.types.Operator):
         bpy.ops.particle.particle_edit_toggle()
     
     
-        bpy.context.scene.objects.active = tempActive
+        bpy.context.view_layer.objects.active = tempActive
         return
     
     def createHairGuides(self, obj, edgeLoops):
@@ -876,12 +875,12 @@ class HairNet (bpy.types.Operator):
     
         return guides
 
-class HairNetPanel(bpy.types.Panel):
+class HAIRNET_PT_panel(bpy.types.Panel):
     bl_idname = "PARTICLE_PT_HairNet"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.5.1"
+    bl_label = "HairNet 0.6.0"
 
 
 
@@ -896,7 +895,7 @@ class HairNetPanel(bpy.types.Panel):
         layout = self.layout
 
         row = layout.row()
-        row.label("Objects Start here")
+        row.label(text = "Objects Start here")
 
         '''Is this a hair object?'''
 
@@ -911,13 +910,13 @@ class HairNetPanel(bpy.types.Panel):
         if not self.headObj.hnIsEmitter:
             box = layout.box()
             row = box.row()
-            row.label("Hair Object:")
-            row.label("Master Hair System:")
+            row.label(text = "Hair Object:")
+            row.label(text = "Master Hair System:")
             for thisHairObject in self.hairObjList:
                 row = box.row()
                 row.prop_search(thisHairObject, 'hnMasterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
                 row = box.row()
-                row.label("Guide Subdivisions:")
+                row.label(text = "Guide Subdivisions:")
                 row.prop(thisHairObject, 'hnSproutHairs', text = "Subdivide U")
 #                 row.prop(thisHairObject, 'hnSubdivideHairSections', text = "Subdivide V")
 
@@ -931,14 +930,14 @@ class HairNetPanel(bpy.types.Panel):
                 
                 
                 row = box.row()
-                row.label("Master Hair System")
+                row.label(text = "Master Hair System")
                 row = box.row()
                 row.prop_search(self.headObj, 'hnMasterHairSystem',  bpy.data, "particles", text = self.headObj.name)
 
             except:
                 pass
             row = box.row()
-            row.label("Guide Subdivisions:")
+            row.label(text = "Guide Subdivisions:")
             row.prop(self.headObj, 'hnSproutHairs', text = "Subdivide U")
             
         row = layout.row()
@@ -949,17 +948,9 @@ class HairNetPanel(bpy.types.Panel):
         row.operator("particle.hairnet", text="Add Hair From Curves").meshKind="CURVE"
         
         
+classes = (HAIRNET_OT_operator, HAIRNET_PT_panel)
 
-
-def register():
-    unregister_module(__name__)
-    register_module(__name__)
-
-
-
-
-def unregister():
-    unregister_module(__name__)
+register, unregister = bpy.utils.register_classes_factory(classes)
 
 if __name__ == '__main__':
     register()
