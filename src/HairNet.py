@@ -678,9 +678,6 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         bpy.context.scene.tool_settings.particle_edit.tool = 'COMB'
         bpy.ops.particle.brush_edit(stroke=[{'name': '', 'location': (0, 0, 0), 'mouse': (0, 0), 'pressure': 0, 'size': 0, 'pen_flip': False, 'time': 0, 'is_start': False}])
         bpy.ops.particle.particle_edit_toggle()
-        bpy.context.scene.tool_settings.particle_edit.tool = 'COMB'
-        bpy.ops.particle.brush_edit(stroke=[{'name': '', 'location': (0, 0, 0), 'mouse': (0, 0), 'pressure': 0, 'size': 0, 'pen_flip': False, 'time': 0, 'is_start': False}])
-        bpy.ops.particle.particle_edit_toggle()
         bpy.context.scene.tool_settings.particle_edit.use_emitter_deflect = False
         bpy.context.scene.tool_settings.particle_edit.use_preserve_root = False
         bpy.context.scene.tool_settings.particle_edit.use_preserve_length = False
@@ -1027,7 +1024,7 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
 
 
 
-
+classes = (HAIRNET_OT_operator, HAIRNET_PT_panel, HAIRNET_PT_view_panel)
 register, unregister = bpy.utils.register_classes_factory(classes)
 
 
