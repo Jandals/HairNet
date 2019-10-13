@@ -412,7 +412,7 @@ def totalNumberSubdivisions(points, cuts):
     return points + (points - 1)*cuts
 
 class HAIRNET_OT_operator (bpy.types.Operator):
-    bl_idname = "particle.hairnet"
+    bl_idname = "hairnet.operator"
     bl_label = "HairNet"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Makes hair guides from mesh edges."
@@ -892,7 +892,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         return guides
 
 class HAIRNET_PT_panel(bpy.types.Panel):
-    bl_idname = "PARTICLE_PT_HairNet"
+    bl_idname = "HAIRNET_PT_HairNet"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
@@ -951,7 +951,7 @@ class HAIRNET_PT_panel(bpy.types.Panel):
             row.prop(self.headObj, 'hnSproutHairs', text = "Subdivide U")
 
 class HAIRNET_PT_view_panel(bpy.types.Panel):
-    bl_idname = "PARTICLE_PT_HairNet_view_panel"
+    bl_idname = "HAIRNET_PT_view_panel"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_label = "HairNet"
@@ -966,11 +966,15 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
         row = col.row(align = True)
         row.label(text="Make Hair")
         row = col.row()
-        row.operator("particle.hairnet", text="Add Hair From Sheets").meshKind="SHEET"
+        row.label(text ="Start")
         row = col.row()
-        row.operator("particle.hairnet", text="Add Hair From Fibers").meshKind="FIBER"
+        row.operator("hairnet.operator", text="Add Hair From Sheets").meshKind="SHEET"
         row = col.row()
-        row.operator("particle.hairnet", text="Add Hair From Curves").meshKind="CURVE"
+        row.operator("hairnet.operator", text="Add Hair From Fibers").meshKind="FIBER"
+        row = col.row()
+        row.operator("hairnet.operator", text="Add Hair From Curves").meshKind="CURVE"
+        row = col.row()
+        row.label(text ="Done")
 
     def drawDetails(self, layout, context):
         self.headObj = context.object
@@ -1024,7 +1028,7 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
 
 
 
-classes = (HAIRNET_OT_operator, HAIRNET_PT_panel, HAIRNET_PT_view_panel)
+classes = (HAIRNET_OT_operator, HAIRNET_PT_panel, HAIRNET_PT_view_panel,)
 register, unregister = bpy.utils.register_classes_factory(classes)
 
 
