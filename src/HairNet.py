@@ -7,10 +7,11 @@
 # NB 1) After running the script to create hair, the user MUST manually enter Particle Mode on the Head object and "touch" each point of each hair guide. Using a large comb brish with very low strength is a good way to do this. If it's not done, the hair strands are likely to be reset to a default/straight-out position during editing.
 # NB 2) All meshes must have the same number of vertices in the direction that corresponds to hair growth
 #---------------------------------------------------
+
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,6,0),
+        "version": (0,6,1),
         "blender": (2,80,0),
         "location": "Properties",
         "category": "Particle",
@@ -23,6 +24,8 @@ import bpy
 import mathutils
 from mathutils import Vector
 from bpy.props import *
+
+versionString = "0.6.1"
 
 bpy.types.Object.hnMasterHairSystem=StringProperty(
         name="hnMasterHairSystem",
@@ -551,7 +554,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                 bpy.context.view_layer.objects.active=tempActive
                 bpy.ops.object.select_all(action='DESELECT')
                 for sel in tempSelected:
-                    sel.select = True
+                    sel.select_set(state=True)
     #            return {'FINISHED'}
 
             if (self.checkGuides(hairGuides)):
@@ -619,10 +622,8 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         tempActive = bpy.context.active_object
         bpy.context.view_layer.objects.active = ob
         
-        
-        
         if debug: print("Active Object: ", bpy.context.active_object.name)
-    
+
         nGuides = len(guides)
         if debug: print("nGguides", nGuides)
         nSteps = len(guides[0])
@@ -901,7 +902,7 @@ class HAIRNET_PT_panel(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "particle"
-    bl_label = "HairNet 0.6.0"
+    bl_label = "HairNet " + versionString
 
 
 
@@ -983,6 +984,7 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
     def drawDetails(self, layout, context):
         self.headObj = context.object
 
+
         #Get a list of hair objects
         self.hairObjList = context.selected_objects
         self.hairObjList.remove(self.headObj)
@@ -1032,7 +1034,9 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
     
 classes = (HAIRNET_OT_operator, HAIRNET_PT_panel, HAIRNET_PT_view_panel)
 
+
 register, unregister = bpy.utils.register_classes_factory(classes)
+
 
 if __name__ == '__main__':
     register()

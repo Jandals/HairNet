@@ -1,0 +1,9 @@
+
+.project
+.pydevproject
+Blend Files/HairNet 2.8 Debug.blend
+*.blend
+*.blend1
+src/__pycache__/HairNet.cpython-37.pyc
+src/Run.py
+src/simp.py

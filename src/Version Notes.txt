@@ -1,5 +1,10 @@
+0.6.1
+updated object selection call
+
 0.6.0
 Updated many calls for Blender 2.80
+Moved interface to 3D_View to fix polling problem while switching to particle edit mode
+uses depsgraph to restore editing particle coordinates
 
 0.4.6
 Fixed an issue which cause hairs to jump out of place when a second or third… hair system is created. The solution was to remove the commands to connect and disconnect the hair system(s).
