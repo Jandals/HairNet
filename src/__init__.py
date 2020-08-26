@@ -25,33 +25,36 @@ import mathutils
 from mathutils import Vector
 from bpy.props import *
 
+from .import_properties import *
+
 versionString = "0.6.1"
 
-bpy.types.Object.hnMasterHairSystem=StringProperty(
+# It is always good to use wrapper prop when attacking to common data block such as Object to reduce blend junk
+class HairNetConfig(PropertyGroup):
+    masterHairSystem: StringProperty(
         name="hnMasterHairSystem",
         description="Name of the hair system to be copied by this proxy object.",
         default="")
+    
+    isHairProxy: BoolProperty(
+            name="hnIsHairProxy",
+            description="Is this object a hair proxy object?",
+            default=False)
 
-bpy.types.Object.hnIsHairProxy=BoolProperty(
-        name="hnIsHairProxy",
-        description="Is this object a hair proxy object?",
-        default=False)
+    isEmitter: BoolProperty(
+            name="hnIsEmitter",
+            description="Is this object a hair emitter object?",
+            default=False)
 
-bpy.types.Object.hnIsEmitter=BoolProperty(
-        name="hnIsEmitter",
-        description="Is this object a hair emitter object?",
-        default=False)
+    sproutHairs: IntProperty(
+            name="hnSproutHairs",
+            description="Number of additional hairs to add.",
+            default=0)
 
-bpy.types.Object.hnSproutHairs=IntProperty(
-        name="hnSproutHairs",
-        description="Number of additional hairs to add.",
-        default=0)
-
-# bpy.types.Object.hnSubdivideHairSections=IntProperty(
-#         name="hnSubdivideHairSections",
-#         description="Number of subdivisions to add along the guide hairs",
-#         default=0)
-
+    # subdivideHairSections: IntProperty(
+    #         name="hnSubdivideHairSections",
+    #         description="Number of subdivisions to add along the guide hairs",
+    #         default=0)
 
 def debPrintVertEdges(vert_edges):
     print("vert_edges: ")
@@ -411,20 +414,26 @@ def sortSeamVerts(verts, edges):
 def totalNumberSubdivisions(points, cuts):
     return points + (points - 1)*cuts
 
+mesh_kinds=[
+    ("SHEET", "Sheets","Create hair from sheets"),
+    ("FIBER", "Fibermesh","Create hair from loose edges"),
+    ("CURVE", "Curves","Create hair from curve splines")
+]
+
 class HAIRNET_OT_operator (bpy.types.Operator):
     bl_idname = "hairnet.operator"
     bl_label = "HairNet"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", 'UNDO'}
     bl_description = "Makes hair guides from mesh edges."
 
-    meshKind : StringProperty()
+    meshKind : EnumProperty(items=mesh_kinds, name="Generator kind", default="FIBER")
+    
     targetHead = False
     headObj = 0
     hairObjList = []
     hairProxyList = []
-
+    
     @classmethod
-
     def poll(self, context):
         return(context.mode == 'OBJECT')
 
@@ -456,19 +465,21 @@ class HAIRNET_OT_operator (bpy.types.Operator):
             hairGuides = []
 
             #if not self.targetHead:
-            if thisHairObj.hnIsEmitter:
+            if thisHairObj.hn_cfg.isEmitter:
                 targetObject = thisHairObj
                 
             #targetObject = targetObject.evaluated_get(depsgraph)
 
             #targetObject = targetObject.evaluated_get(depsgraph)
-
+            
+            config=thisHairObj.hn_cfg
+            
             sysName = ''.join(["HN", thisHairObj.name])
             options[5] = sysName
 
             if sysName in targetObject.particle_systems:
                 #if this proxy object has an existing hair system on the target object, preserve its current settings
-                if thisHairObj.hnMasterHairSystem == "":
+                if config.masterHairSystem == "":
                     '''_TS Preserve and out'''
                     options[0] = targetObject.particle_systems[sysName].settings
                     options[2] = targetObject.particle_systems[sysName]
@@ -484,14 +495,14 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                     #Delete Particle System Settings
                     bpy.data.particles.remove(delSet)
                     #Copy Hair settings from master.
-                    options[0] = bpy.data.particles[thisHairObj.hnMasterHairSystem].copy()
+                    options[0] = bpy.data.particles[config.masterHairSystem].copy()
 
                     options[2] = makeNewHairSystem(targetObject,sysName)
             else:
                 #Create a new hair system
-                if thisHairObj.hnMasterHairSystem != "":
+                if config.masterHairSystem != "":
                     '''T_S copy, create new and out'''
-                    options[0] = bpy.data.particles[thisHairObj.hnMasterHairSystem].copy()
+                    options[0] = bpy.data.particles[config.masterHairSystem].copy()
 #                     options[2] = self.headObj.particle_systems[sysName]
 
                 '''_T_S create new and out'''
@@ -906,7 +917,8 @@ class HAIRNET_PT_panel(bpy.types.Panel):
 
         #Get a list of hair objects
         self.hairObjList = context.selected_objects
-        self.hairObjList.remove(self.headObj)
+        if self.headObj in self.hairObjList:
+            self.hairObjList.remove(self.headObj)
 
         layout = self.layout
 
@@ -956,25 +968,27 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
     bl_region_type = "UI"
     bl_label = "HairNet"
     bl_category = "HNet"
+    
+    
     def draw(self, context):
         object = context.active_object
         if object is not None:
             self.drawButtons(self.layout)
             self.drawDetails(self.layout, context)
+    
     def drawButtons(self, layout):
         col = layout.box().column(align = True)
+        
         row = col.row(align = True)
         row.label(text="Make Hair")
+        
         row = col.row()
-        row.label(text ="Start")
-        row = col.row()
-        row.operator("hairnet.operator", text="Add Hair From Sheets").meshKind="SHEET"
-        row = col.row()
-        row.operator("hairnet.operator", text="Add Hair From Fibers").meshKind="FIBER"
-        row = col.row()
-        row.operator("hairnet.operator", text="Add Hair From Curves").meshKind="CURVE"
-        row = col.row()
-        row.label(text ="Done")
+        row.label(text ="Add Hair From:")
+        
+        col = col.row(align = True)
+        for kind in mesh_kinds:
+            col.operator("hairnet.operator", text=kind[1]).meshKind=kind[0]
+        
 
     def drawDetails(self, layout, context):
         self.headObj = context.object
@@ -982,7 +996,8 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
 
         #Get a list of hair objects
         self.hairObjList = context.selected_objects
-        self.hairObjList.remove(self.headObj)
+        if self.headObj in self.hairObjList:
+            self.hairObjList.remove(self.headObj)
 
         layout = self.layout
 
@@ -1004,11 +1019,12 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
             row.label(text = "Hair Object:")
             row.label(text = "Use Settings:")
             for thisHairObject in self.hairObjList:
+                config=thisHairObject.hn_cfg
                 row = box.row()
-                row.prop_search(thisHairObject, 'hnMasterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
+                row.prop_search(config, 'masterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
                 row = box.row()
                 row.label(text = "Add Guides:")
-                row.prop(thisHairObject, 'hnSproutHairs', text = "SubD")
+                row.prop(config, 'sproutHairs', text = "SubD")
 #                 row.prop(thisHairObject, 'hnSubdivideHairSections', text = "Subdivide V")
 
         #Draw this if it's a self-emitter object
@@ -1028,9 +1044,22 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
 
 
 
-classes = (HAIRNET_OT_operator, HAIRNET_PT_panel, HAIRNET_PT_view_panel,)
-register, unregister = bpy.utils.register_classes_factory(classes)
+classes = (
+    HAIRNET_OT_operator, 
+    HAIRNET_PT_panel, 
+    HAIRNET_PT_view_panel,
+    HairNetConfig,
+)
 
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    
+    bpy.types.Object.hn_cfg=PointerProperty(type=HairNetConfig)
+
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
 
 if __name__ == '__main__':
     register()
