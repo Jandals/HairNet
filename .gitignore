@@ -8,3 +8,5 @@ src/__pycache__/HairNet.cpython-37.pyc
 src/Run.py
 src/simp.py
 *.pyc
+.settings/org.eclipse.ltk.core.refactoring.prefs
+Release/
