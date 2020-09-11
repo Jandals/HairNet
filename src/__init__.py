@@ -11,8 +11,8 @@
 bl_info = {
         "name":"HairNet",
         "author": "Rhett Jackson",
-        "version": (0,6,1),
-        "blender": (2,80,0),
+        "version": (0,6,2),
+        "blender": (2,90,0),
         "location": "Properties",
         "category": "Particle",
         "description": "Creates a particle hair system with hair guides from mesh edges which start at marked seams.",
@@ -25,9 +25,9 @@ import mathutils
 from mathutils import Vector
 from bpy.props import *
 
-from .import_properties import *
+from import_properties import  *
 
-versionString = "0.6.1"
+versionString = "0.6.2"
 
 # It is always good to use wrapper prop when attacking to common data block such as Object to reduce blend junk
 class HairNetConfig(PropertyGroup):
@@ -327,7 +327,7 @@ def sortLoop(obj, vloop, v1, seamEdges, vert_edges):
 
 def sortSeamVerts(verts, edges):
 
-    debug = True
+    debug = False
     sortedVerts = []
     usedEdges = []
     triedVerts = []
@@ -596,14 +596,14 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         #Get a list of hair objects
         self.hairObjList = []
         for obj in bpy.context.selected_objects:
-            if obj != self.headObj or obj.hnIsEmitter:
+            if obj != self.headObj or obj.hn_cfg.isEmitter:
                 self.hairObjList.append(obj)
 
 
         #if the last object selected is not flagged as a self-emitter, then assume we are creating hair on a head
         #Otherwise, each proxy will grow its own hair
 
-        if not self.headObj.hnIsEmitter:
+        if not self.headObj.hn_cfg.isEmitter:
             self.targetHead=True
             if len(bpy.context.selected_objects) < 2:
                 self.report(type = {'ERROR'}, message = "Selection too small. Please select two objects")
@@ -840,10 +840,10 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         numberHairs = len(guides)
 
         #number of hairs added between existing hairs
-        hairSprouts = hairObj.hnSproutHairs
+        hairSprouts = hairObj.hn_cfg.sproutHairs
 
         #subdivide hairs
-        if hairObj.hnSproutHairs > 0:
+        if hairObj.hn_cfg.sproutHairs > 0:
             #initialize an empty array so we don't have to think about inserting entries into lists. Check into this for later?
             newHairs = [[0 for i in range(hairLength)] for j in range(totalNumberSubdivisions(numberHairs, hairSprouts))]
             if debug: print ("Subdivide Hairs")
@@ -908,7 +908,7 @@ class HAIRNET_PT_panel(bpy.types.Panel):
     bl_region_type = "WINDOW"
     bl_context = "particle"
     bl_label = "HairNet " + versionString
-
+    
 
 
     def draw(self, context):
@@ -925,26 +925,26 @@ class HAIRNET_PT_panel(bpy.types.Panel):
         row = layout.row()
         row.label(text = "Objects Start here")
 
-        '''Is this a hair object?'''
+        #Is this a hair object?
 
         row = layout.row()
         try:
-            row.prop(self.headObj, 'hnIsEmitter', text = "Emit Hair on Self")
+            row.prop(self.headObj.hn_cfg, 'isEmitter', text = "Emit Hair on Self")
         except:
             pass
 
         #Draw this if this is a head object
-        if not self.headObj.hnIsEmitter:
+        if not self.headObj.hn_cfg.isEmitter:
             box = layout.box()
             row = box.row()
             row.label(text = "Hair Object:")
             row.label(text = "Master Hair System:")
             for thisHairObject in self.hairObjList:
                 row = box.row()
-                row.prop_search(thisHairObject, 'hnMasterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
+                row.prop_search(thisHairObject.hn_cfg, 'masterHairSystem',  bpy.data, "particles", text = thisHairObject.name)
                 row = box.row()
                 row.label(text = "Guide Subdivisions:")
-                row.prop(thisHairObject, 'hnSproutHairs', text = "Subdivide U")
+                row.prop(thisHairObject.hn_cfg, 'sproutHairs', text = "Subdivide U")
 #                 row.prop(thisHairObject, 'hnSubdivideHairSections', text = "Subdivide V")
 
         #Draw this if it's a self-emitter object
@@ -954,20 +954,23 @@ class HAIRNET_PT_panel(bpy.types.Panel):
                 row = box.row()
                 row.label(text = "Master Hair System")
                 row = box.row()
-                row.prop_search(self.headObj, 'hnMasterHairSystem',  bpy.data, "particles", text = self.headObj.name)
+                row.prop_search(self.headObj.hn_cfg, 'masterHairSystem',  bpy.data, "particles", text = self.headObj.name)
 
             except:
                 pass
             row = box.row()
             row.label(text = "Guide Subdivisions:")
-            row.prop(self.headObj, 'hnSproutHairs', text = "Subdivide U")
+            row.prop(self.headObj.hn_cfg, 'sproutHairs', text = "Subdivide U")
+
 
 class HAIRNET_PT_view_panel(bpy.types.Panel):
+    bl_label = "HairNet"
     bl_idname = "HAIRNET_PT_view_panel"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_label = "HairNet"
-    bl_category = "HNet"
+    bl_category = "Hair"
+    bl_context = "objectmode"
+    bl_options = {"DEFAULT_CLOSED"}
     
     
     def draw(self, context):
@@ -985,9 +988,10 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
         row = col.row()
         row.label(text ="Add Hair From:")
         
-        col = col.row(align = True)
+        row = col.row(align = True)
         for kind in mesh_kinds:
-            col.operator("hairnet.operator", text=kind[1]).meshKind=kind[0]
+            row = col.row(align = True)
+            row.operator("hairnet.operator", text=kind[1]).meshKind=kind[0]
         
 
     def drawDetails(self, layout, context):
@@ -1008,12 +1012,12 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
 
         row = layout.row()
         try:
-            row.prop(self.headObj, 'hnIsEmitter', text = "Emit Hair on Self")
+            row.prop(self.headObj.hn_cfg, 'isEmitter', text = "Emit Hair on Self")
         except:
             pass
 
         #Draw this if this is a head object
-        if not self.headObj.hnIsEmitter:
+        if not self.headObj.hn_cfg.isEmitter:
             box = layout.box()
             row = box.row()
             row.label(text = "Hair Object:")
@@ -1033,14 +1037,15 @@ class HAIRNET_PT_view_panel(bpy.types.Panel):
             try:
                 row = box.row()
                 row.label(text = "Use Settings")
+                
                 row = box.row()
-                row.prop_search(self.headObj, 'hnMasterHairSystem',  bpy.data, "particles", text = self.headObj.name)
+                row.prop_search(self.headObj.hn_cfg, 'masterHairSystem',  bpy.data, "particles", text = self.headObj.name)
 
             except:
                 pass
             row = box.row()
             row.label(text = "Guide Subdivisions:")
-            row.prop(self.headObj, 'hnSproutHairs', text = "SubD")
+            row.prop(self.headObj.hn_cfg, 'sproutHairs', text = "SubD")
 
 
 
