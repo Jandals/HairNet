@@ -10,3 +10,8 @@ src/simp.py
 *.pyc
 .settings/org.eclipse.ltk.core.refactoring.prefs
 Release/
+prev/__init__.py
+prev/hairNet.py
+prev/import_properties.py
+hairNet/Run.py
+hairNet/simp.py
