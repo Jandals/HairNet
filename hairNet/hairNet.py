@@ -23,7 +23,7 @@ from . import_properties import  *
 versionString = "0.6.2"
 
 #Start Debug
-DEBUG = 1
+DEBUG = 0
 
 if DEBUG == 1:
     import sys
