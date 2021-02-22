@@ -20,7 +20,7 @@ from bpy.props import *
 
 from . import_properties import  *
 
-versionString = "0.6.2"
+versionString = "0.6.4"
 
 #Start Debug
 DEBUG = 1
@@ -547,10 +547,9 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                 #hairObj = bpy.context.selected_objects[0]
                 hairObj = thisHairObj
                 bpy.ops.object.select_all(action='DESELECT')
-
-                if hairObj.data.bevel_object != None:
+                
+                if hairObj.data.bevel_depth > 0.0:
                     error = 3
-
 
                 bpy.context.view_layer.objects.active=hairObj
                 hairObj.select_set(state=True)
@@ -691,19 +690,20 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         # Connect hair to mesh
         # Segmentation violation during render if this line is absent.
         # Connecting hair moves the mesh points by an amount equal to the object's location
-
+        
         bpy.ops.particle.particle_edit_toggle()
-        bpy.context.scene.tool_settings.particle_edit.tool = 'COMB'
-        bpy.ops.particle.brush_edit(stroke=[{'name': '', 'location': (0, 0, 0), 'mouse': (0, 0), 'pressure': 0, 'size': 0, 'pen_flip': False, 'time': 0, 'is_start': False}])
+
+        #bpy.context.scene.tool_settings.particle_edit.tool = 'COMB'
+        bpy.ops.particle.brush_edit(stroke=[{'name': '', 'location': (0, 0, 0), 'mouse': (0, 0), 'mouse_event':(0, 0), 'pressure': 0, 'size': 0, 'pen_flip': False,  "x_tilt":0, "y_tilt":0, 'time': 0, 'is_start': False}])
         bpy.ops.particle.particle_edit_toggle()
         bpy.context.scene.tool_settings.particle_edit.use_emitter_deflect = False
         bpy.context.scene.tool_settings.particle_edit.use_preserve_root = False
         bpy.context.scene.tool_settings.particle_edit.use_preserve_length = False
-
+        
         bpy.ops.particle.disconnect_hair(all=True)
         #Connecting and disconnecting hair causes them to jump when other particle systems are created.
         bpy.ops.particle.connect_hair(all=True)
-        
+
         targetObj = options[4]
         
         depsgraph = bpy.context.evaluated_depsgraph_get()
