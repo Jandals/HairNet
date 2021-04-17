@@ -11,7 +11,7 @@
 
 import bpy
 import mathutils
-
+import os
 import traceback
 
 
@@ -20,12 +20,15 @@ from bpy.props import *
 
 from . import_properties import  *
 
-versionString = "0.6.4"
+from pathlib import Path
+
+versionString = "0.6.5"
 
 #Start Debug
-DEBUG = 1
 
-if DEBUG == 1:
+hnDebFile = os.path.join(os.path.dirname(__file__), 'hairNetDeb.txt')
+if Path(hnDebFile).is_file():
+    print("HN Debug File Exists")
     import sys
     pydev_path = '/Users/rhett/.p2/pool/plugins/org.python.pydev.core_7.7.0.202008021154/pysrc'
     if sys.path.count(pydev_path) < 1: sys.path.append(pydev_path) 
@@ -33,6 +36,8 @@ if DEBUG == 1:
     import pydevd
     
     pydevd.settrace(stdoutToServer=True, stderrToServer=True, suspend=False)
+else:
+    print("HN Debug File Doesn't exist")
     
 #End Debug
 

@@ -19,7 +19,7 @@
 bl_info = {
         "name":"hairNet",
         "author": "Rhett Jackson",
-        "version": (0,6,2),
+        "version": (0,6,5),
         "blender": (2,90,0),
         "location": "Properties",
         "category": "Particle",
@@ -45,13 +45,13 @@ import bpy
 
 
 def register():
-    hairNet.register()
-
+	hairNet.register()
+	#import_properties.register()
 
 
 def unregister():
-    hairNet.unregister()
-
+	hairNet.unregister()
+	#import_properties.unregister()
 
 if __name__ == "__main__":
     register()
