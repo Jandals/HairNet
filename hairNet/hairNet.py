@@ -608,7 +608,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                     #Take each edge loop and extract coordinate data from its verts
 
             if (self.meshKind=="FIBER"):
-                hairObj = self.hairObjList[0]
+                hairObj = thisHairObj
                 if debug: print("Hair fiber")
                 hairGuides = self.fibersToGuides(hairObj)
 
