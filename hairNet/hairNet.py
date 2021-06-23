@@ -41,6 +41,75 @@ else:
     
 #End Debug
 
+class UnionFindList: # a combination of unionfind and singlelinkedlist
+    def __init__(self, n):
+        self.parent = [ i for i in range(n) ]
+        self.next = [ -1 for _ in range(n) ]
+        self.rank = [ 1 for _ in range(n) ]
+    def findRoots(self):
+        return [ i for i, v in enumerate(self.parent) if i == v and self.rank[i] != 1 ] # ignore single point
+    def findRoot(self, x):
+        if self.parent[x] == x:
+            return x
+        self.parent[x] = self.findRoot(self.parent[x])
+        return self.parent[x]
+    def getNext(self, x): # return -1 if no next
+        return self.next[x]
+    def getChainLength(self, x): # x must be the root
+        return self.rank[x]
+    def getChain(self, x):
+        ret = []
+        x_next = x
+        while x_next != -1:
+            ret.append(x_next)
+            x_next = self.next[x_next]
+        return ret
+    def reverseChain(self, x_root, x): # x_root is the head of list, x is the end of list
+        if self.rank[x_root] == 1: return
+        x_pre = -1
+        x_cur = x_root
+        while x_cur != -1:
+            x_next = self.next[x_cur]
+            self.next[x_cur] = x_pre
+            self.parent[x_cur] = x # parent of all nodes should be x after reversing
+            x_pre = x_cur
+            x_cur = x_next
+        self.rank[x] = self.rank[x_root]
+    def union(self, x, y):
+        x_root = self.findRoot(x)
+        y_root = self.findRoot(y)
+        if x_root == y_root: # already connected
+            return
+            
+        if y_root != y and x_root != x: 
+            # Case 1: two root points are independent, should reverse one of chains, choose shorter chain to reverse
+            # and transform this situation to Case 2
+            if self.rank[x_root] <= self.rank[y_root]:
+                self.reverseChain(x_root, x)
+                x_root = x
+            else:
+                self.reverseChain(y_root, y)
+                y_root = y
+                
+        if y_root == y: # Case 2: one of two points is dependent or all two points are dependent
+            if self.next[x] != -1:
+                self.parent[x] = y
+                self.next[y] = x
+                self.rank[y] = self.rank[y] + self.rank[x] # y become new root
+            else:
+                self.parent[y] = x_root
+                self.next[x] = y
+                self.rank[x_root] = self.rank[x_root] + self.rank[y]
+        elif x_root == x:
+            if self.next[y] != -1:
+                self.parent[y] = x 
+                self.next[x] = y 
+                self.rank[x] = self.rank[x] + self.rank[y] # x become new root
+            else:
+                self.parent[x] = y_root
+                self.next[y] = x
+                self.rank[y_root] = self.rank[y_root] + self.rank[x]
+
 # It is always good to use wrapper prop when attacking to common data block such as Object to reduce blend junk
 class HairNetConfig(PropertyGroup):
     masterHairSystem: StringProperty(
@@ -539,7 +608,7 @@ class HAIRNET_OT_operator (bpy.types.Operator):
                     #Take each edge loop and extract coordinate data from its verts
 
             if (self.meshKind=="FIBER"):
-                hairObj = self.hairObjList[0]
+                hairObj = thisHairObj
                 if debug: print("Hair fiber")
                 hairGuides = self.fibersToGuides(hairObj)
 
@@ -752,82 +821,25 @@ class HAIRNET_OT_operator (bpy.types.Operator):
         return hairGuides
 
     def fibersToGuides(self, hairObj):
-        guides = []
-        hairs = self.getHairsFromFibers(hairObj)
+        import time # evaluation
+        time_start = time.time()
 
-        for hair in hairs:
-            guide = []
-            for vertIdx in hair:
-                guide.append(hairObj.data.vertices[vertIdx].co.to_tuple())
-            guides.append(guide)
-        return guides
-
-    def getHairsFromFibers(self, hair):
-        me = hair.data
-        usedV = []
-        usedE = []
-        guides = []
-
-        # Create a dictionary with the vert index as key and edge-keys as value
-        #It's a list of verts and the keys are the edges the verts belong to
-        vert_edges = dict([(v.index, []) for v in me.vertices if v.hide!=1])
+        me = hairObj.data
+        uf = UnionFindList(len(me.vertices))
         for ed in me.edges:
-            for v in ed.key:
-                if ed.key[0] in vert_edges and ed.key[1] in vert_edges:
-                    vert_edges[v].append(ed.key)
+            # the edge wouldn't exist if one of points is hidden
+            if me.vertices[ed.key[0]].hide == True or me.vertices[ed.key[1]].hide == True: continue
+            uf.union(ed.key[0], ed.key[1])
 
-        #endPoints = dict([(v, []) for v in vert_edges if len(vert_edges[v])<2])
-        endPoints = [v for v in vert_edges if len(vert_edges[v])<2]
+        ret = [ [ hairObj.data.vertices[vertIdx].co.to_tuple() for vertIdx in uf.getChain(vert) ] for vert in uf.findRoots() ]
 
-        #For every endpoint
-        for vert in endPoints:
-                hair=[]
-                #print("first endpoint is ", vert)
-                #check if EP has been used already in case it was a tail end already
-                if vert not in usedV:
-                    #lookup the endpoint in vert_edges to get the edge(s) it's in
-                    thisEdge = getEdgeFromKey(me,vert_edges[vert][0])
-                    #print("Got edge ", thisEdge)
-                    #Add the vert to the hair
-                    hair.append(vert)
-                    #mark the current vert as used
-                    #mark the current edge as used
-                    usedE.append(thisEdge)
-                    usedV.append(vert)
-                    #get the next/other vert in the edge
-                    #make it the current vert
-                    vert = getNextVertInEdge(thisEdge,vert)
-                    #print("got next vert ", vert, " edges", vert_edges[vert])
-                    #while the number of edges the current vert is  > 1
-                    while len(vert_edges[vert])>1:
-                        #lookup the endpoint in vert_edges to get the edge(s) it's in
-                        thisEdge = getEdgeFromKey(me,vert_edges[vert][0])
+        time_end = time.time()
+        print("Function getHairsFromFibers cost:", time_end-time_start)
+        #default cost: 139.5683515071869 # 33,192 points
+        #now cost: 0.5224146842956543 # 33,192 points
+        #now cost: 1.9567747116088867 # 137,238 points
 
-                        if thisEdge in usedE:
-                            thisEdge = getEdgeFromKey(me,vert_edges[vert][1])
-                        #Add the vert to the hair
-                        hair.append(vert)
-                        #mark the current vert as used
-                        #mark the current edge as used
-                        usedE.append(thisEdge)
-                        usedV.append(vert)
-                        #get the next/other vert in the edge
-                        #make it the current vert
-                        vert = getNextVertInEdge(thisEdge,vert)
-                        #print("vert #", vert)
-                        #print("edge #", thisEdge)
-                        #print(vert_edges[vert])
-
-
-                    #Add the current vert to the hair
-                    hair.append(vert)
-                    #mark the current vert as used
-                    usedV.append(vert)
-                    #add the hair to the list of hairs
-                    guides.append(hair)
-
-        #guides now holds a list of hairs where each hair is a list of vertex indices in the mesh "me"
-        return guides
+        return ret
 
     def loopsToGuides(self, obj, edgeLoops, hairGuides):
         guides = hairGuides
