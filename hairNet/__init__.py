@@ -19,7 +19,7 @@
 bl_info = {
         "name":"hairNet",
         "author": "Rhett Jackson",
-        "version": (0,6,5),
+        "version": (0,6,6),
         "blender": (2,90,0),
         "location": "Properties",
         "category": "Particle",
