@@ -64,8 +64,13 @@ class UnionFindList: # a combination of unionfind and singlelinkedlist
             ret.append(x_next)
             x_next = self.next[x_next]
         return ret
-    def reverseChain(self, x_root, x): # x_root is the head of list, x is the end of list
-        if self.rank[x_root] == 1: return
+    def reverseChain(self, x_root): # x_root is the head of list
+        if self.rank[x_root] == 1: return x_root
+        
+        x = x_root # x is the end of list
+        while self.next[x] != -1:
+            x = self.next[x] # find last element
+        
         x_pre = -1
         x_cur = x_root
         while x_cur != -1:
@@ -75,21 +80,21 @@ class UnionFindList: # a combination of unionfind and singlelinkedlist
             x_pre = x_cur
             x_cur = x_next
         self.rank[x] = self.rank[x_root]
+
+        return x # return new root
     def union(self, x, y):
         x_root = self.findRoot(x)
         y_root = self.findRoot(y)
         if x_root == y_root: # already connected
             return
             
-        if y_root != y and x_root != x: 
+        if (y_root != y and x_root != x) or (y_root == y and x_root == x): 
             # Case 1: two root points are independent, should reverse one of chains, choose shorter chain to reverse
             # and transform this situation to Case 2
             if self.rank[x_root] <= self.rank[y_root]:
-                self.reverseChain(x_root, x)
-                x_root = x
+                x_root = self.reverseChain(x_root)
             else:
-                self.reverseChain(y_root, y)
-                y_root = y
+                y_root = self.reverseChain(y_root)
                 
         if y_root == y: # Case 2: one of two points is dependent or all two points are dependent
             if self.next[x] != -1:
