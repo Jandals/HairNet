@@ -1,10 +1,7 @@
 # Attention:
-HairNet now works in Blender 2.80. 
+HairNet now works in Blender 5.1!
 
-The buttons for the interface have moved to the Numeric Panel in the 3DView (N-key)
-
-HairNet for 2.79 still works.
-
+Generate From sheets doesn't work yet
 # HairNet
 HairNet addon for Blender
 
@@ -16,6 +13,7 @@ https://blenderartists.org/t/hair-guides-created-from-mesh-objects/572642
 
 Installation:
 Visit the "Releases" page and download version 0.5.1.
-https://github.com/Jandals/HairNet/releases
+
+https://github.com/SwordStrike105/HairNet-for-5.0/releases/
 
 Then use Blender's "User Preferences" window to "Install Addon From File." Choose the ZIP file you just downloaded and that should be all.
